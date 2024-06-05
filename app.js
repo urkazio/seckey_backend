@@ -14,4 +14,3 @@ app.get('/prueba', (req, res) => {
 });
 
 module.exports = app;
-
