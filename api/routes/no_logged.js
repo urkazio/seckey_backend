@@ -5,7 +5,7 @@ const config = require('../../config'); // importar el fichero que contiene la c
 const jwt = require('jsonwebtoken');
 
 // metodo que verifica credenciales llamando a la bbdd
-router.post('/signin', (req, res) => {
+router.post('/login', (req, res) => {
     const { email, pass} = req.body;
   
     dbQuery.getUser(email, pass, (err, userData) => {
