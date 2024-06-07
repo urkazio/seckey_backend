@@ -4,7 +4,7 @@ const mysqlConnection = mysql.createPool({
     host:'localhost',
     user: 'root',
     password: '',
-    database: 'sireno',
+    database: 'seckey',
     port: '3306'
 });
  
@@ -30,5 +30,5 @@ mysqlConnection.getConnection((err, connection) => {
     return
 })
 
-module.exports = connection
+module.exports = mysqlConnection
 
