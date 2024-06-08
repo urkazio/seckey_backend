@@ -41,7 +41,7 @@ function register(user, pass, callback) {
     [user],
     (err, rows, fields) => {
       if (err) {
-        callback({ status: 500, message: 'ERROR: en la consulta de la base de datos', error: err });
+        callback({ status: 500, message: 'ERROR: Inténtelo más tarde', error: err });
       } else if (rows.length > 0) {
         // Si el usuario ya existe
         callback({ status: 400, message: 'ERROR: Email ya registrado' });
@@ -52,7 +52,7 @@ function register(user, pass, callback) {
           [user, hash, 'user'], // Asumimos que el rol por defecto es 'user'
           (err, results) => {
             if (err) {
-              callback({ status: 500, message: 'ERROR: usuario no insertado', error: err });
+              callback({ status: 500, message: 'ERROR: Usuario no insertado', error: err });
             } else {
               callback({ status: 200, message: 'OK' });
             }
@@ -63,10 +63,27 @@ function register(user, pass, callback) {
   );
 }
 
+function comprobarMail(email, callback) {
+  mysqlConnection.query(
+    'SELECT email FROM any_logged WHERE email = ?',
+    [email],
+    (err, rows) => {
+      if (err) {
+        callback({ status: 500, message: 'ERROR: Inténtelo más tarde', error: err });
+      } else if (rows.length > 0) {
+        callback(null);
+      } else {
+        callback({ status: 500, message: 'ERROR: Email no registrado', error: err });
+      }
+    }
+  );
+}
+
 
   
 // exportar las funciones definidas en este fichero
 module.exports = {
   login,
-  register
+  register,
+  comprobarMail
   };
