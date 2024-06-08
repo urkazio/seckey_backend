@@ -5,7 +5,7 @@ const config = require('../../config'); // importar el fichero que contiene la c
 
 // ++++++++++++++++++++++++++++++++++++ USUARIOS NO_LOGGED ++++++++++++++++++++++++++++++++++++
 
-function getUser(user, pass, callback) {
+function login(user, pass, callback) {
     const iterations = 1000;
     const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations });
   
@@ -30,7 +30,43 @@ function getUser(user, pass, callback) {
     );
   }
 
+
+function register(user, pass, callback) {
+  const iterations = 1000;
+  const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations }).toString();
+
+  // Primero busca si el usuario ya existe
+  mysqlConnection.query(
+    'SELECT email, rol FROM any_logged WHERE email = ?',
+    [user],
+    (err, rows, fields) => {
+      if (err) {
+        callback({ status: 500, message: 'ERROR: en la consulta de la base de datos', error: err });
+      } else if (rows.length > 0) {
+        // Si el usuario ya existe
+        callback({ status: 400, message: 'ERROR: Email ya registrado' });
+      } else {
+        // Si el usuario no existe, lo insertamos
+        mysqlConnection.query(
+          'INSERT INTO any_logged (email, pass, rol) VALUES (?, ?, ?)',
+          [user, hash, 'user'], // Asumimos que el rol por defecto es 'user'
+          (err, results) => {
+            if (err) {
+              callback({ status: 500, message: 'ERROR: usuario no insertado', error: err });
+            } else {
+              callback({ status: 200, message: 'OK' });
+            }
+          }
+        );
+      }
+    }
+  );
+}
+
+
+  
 // exportar las funciones definidas en este fichero
 module.exports = {
-    getUser
+  login,
+  register
   };
