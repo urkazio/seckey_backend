@@ -42,22 +42,23 @@ router.post('/recuperar/comprobar', (req, res) => {
       // Generar un código de recuperación de 6 dígitos
       const recoveryCode = Math.floor(100000 + Math.random() * 900000); // Código de 6 dígitos
 
+      // Configurar el servicio de correo
       const transporter = nodemailer.createTransport({
-        service: 'Gmail', // Configurar el servicio de correo
+        service: 'Gmail', 
         auth: {
           user: 'urkogarcia12@gmail.com', // Dirección de correo electrónico remitente
           pass: config.pass_email // Utiliza la contraseña desde config.js
         }
       });
 
+      // Configurar el correo a enviar
       const mailOptions = {
-        from: 'urkogarcia12@gmail.com', // Dirección de correo electrónico remitente
+        from: 'urkogarcia12@gmail.com',
         to: email,
         subject: 'Recuperación contraseña SecKey',
         text: `Tu código de recuperación es: ${recoveryCode}`
       };
 
-      
       // Enviar el correo electrónico
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
@@ -73,6 +74,21 @@ router.post('/recuperar/comprobar', (req, res) => {
     }
   });
 });
+
+
+router.post('/recuperar/reestablecer', (req, res) => {
+  const { email, pass } = req.body;
+
+  dbQuery.reestablecer(email, pass, (err, userData) => {
+    if (!err) {
+      res.json({ status: 200, message: 'Contraseña actualizada exitosamente' });
+    } else {
+      res.status(500).json(err);
+    }
+  });
+});
+
+
 
 // Se exporta el router del usuario para poder usarlo desde app.js (todas las rutas)
 module.exports = router;

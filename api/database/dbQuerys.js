@@ -80,10 +80,31 @@ function comprobarMail(email, callback) {
 }
 
 
+function reestablecer(email, pass, callback) {
+  const iterations = 1000;
+  const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations }).toString();
+
+  mysqlConnection.query(
+    'UPDATE any_logged SET pass = ? WHERE email = ?',
+    [hash, email],
+    (err, result) => {
+      if (err) {
+        callback({ status: 500, message: 'ERROR: No se pudo actualizar la contraseña', error: err });
+      } else if (result.affectedRows > 0) {
+        callback(null, { status: 200, message: 'Contraseña actualizada exitosamente' });
+      } else {
+        callback({ status: 400, message: 'ERROR: Email no registrado' });
+      }
+    }
+  );
+}
+
+
   
 // exportar las funciones definidas en este fichero
 module.exports = {
   login,
   register,
-  comprobarMail
+  comprobarMail,
+  reestablecer
   };
