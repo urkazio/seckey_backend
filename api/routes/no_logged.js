@@ -21,9 +21,9 @@ router.post('/login', (req, res) => {
 });
 
 router.post('/register', (req, res) => {
-  const { email, pass } = req.body;
+  const { email, pass, nombre } = req.body;
 
-  dbQuery.register(email, pass, (err, userData) => {
+  dbQuery.register(email, pass, nombre, (err, userData) => {
     if (!err) {
       res.json(userData);
     } else {
@@ -31,6 +31,7 @@ router.post('/register', (req, res) => {
     }
   });
 });
+
 
 router.post('/recuperar/comprobar', (req, res) => {
   const { email } = req.body;

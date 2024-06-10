@@ -31,37 +31,49 @@ function login(user, pass, callback) {
   }
 
 
-function register(user, pass, callback) {
-  const iterations = 1000;
-  const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations }).toString();
-
-  // Primero busca si el usuario ya existe
-  mysqlConnection.query(
-    'SELECT email, rol FROM any_logged WHERE email = ?',
-    [user],
-    (err, rows, fields) => {
-      if (err) {
-        callback({ status: 500, message: 'ERROR: Inténtelo más tarde', error: err });
-      } else if (rows.length > 0) {
-        // Si el usuario ya existe
-        callback({ status: 400, message: 'ERROR: Email ya registrado' });
-      } else {
-        // Si el usuario no existe, lo insertamos
-        mysqlConnection.query(
-          'INSERT INTO any_logged (email, pass, rol) VALUES (?, ?, ?)',
-          [user, hash, 'user'], // Asumimos que el rol por defecto es 'user'
-          (err, results) => {
-            if (err) {
-              callback({ status: 500, message: 'ERROR: Usuario no insertado', error: err });
-            } else {
-              callback({ status: 200, message: 'OK' });
+  function register(user, pass, nombre, callback) {
+    const iterations = 1000;
+    const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations }).toString();
+  
+    // Primero busca si el usuario ya existe
+    mysqlConnection.query(
+      'SELECT email, rol FROM any_logged WHERE email = ?',
+      [user],
+      (err, rows, fields) => {
+        if (err) {
+          callback({ status: 500, message: 'ERROR: Inténtelo más tarde', error: err });
+        } else if (rows.length > 0) {
+          // Si el usuario ya existe
+          callback({ status: 400, message: 'ERROR: Email ya registrado' });
+        } else {
+          // Si el usuario no existe, lo insertamos
+          mysqlConnection.query(
+            'INSERT INTO any_logged (email, pass, rol) VALUES (?, ?, ?)',
+            [user, hash, 'user'], // Asumimos que el rol por defecto es 'user'
+            (err, results) => {
+              if (err) {
+                callback({ status: 500, message: 'ERROR: Usuario no insertado', error: err });
+              } else {
+                // Después de insertar en any_logged, inserta en user_logged
+                mysqlConnection.query(
+                  'INSERT INTO user_logged (nombre, email_user) VALUES (?, ?)',
+                  [nombre, user],
+                  (err, results) => {
+                    if (err) {
+                      callback({ status: 500, message: 'ERROR: Usuario no insertado en user_logged', error: err });
+                    } else {
+                      callback({ status: 200, message: 'OK' });
+                    }
+                  }
+                );
+              }
             }
-          }
-        );
+          );
+        }
       }
-    }
-  );
-}
+    );
+  }
+  
 
 function comprobarMail(email, callback) {
   mysqlConnection.query(

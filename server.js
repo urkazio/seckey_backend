@@ -2,7 +2,7 @@ const fs = require('fs');
 const https = require('https');
 const app = require('./app');
 
-// Leer los archivos del certificado SSL
+// Leer los archivos del certificado
 const options = {
     key: fs.readFileSync('D:/UNIVERSIDAD/master/TFM/SERVIDOR/server.key'),
     cert: fs.readFileSync('D:/UNIVERSIDAD/master/TFM/SERVIDOR/server.cert')
