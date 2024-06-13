@@ -12,6 +12,31 @@ router.post('/prueba', (req, res) => {
 
 });
 
+router.post('/getCategorias', (req, res) => {
+  const { email } = req.body;
+
+  dbQuery.getCategorias(email, (err, userData) => {
+    if (!err) {
+      res.json(userData);
+    } else {
+      res.status(500).json(err);
+    }
+  });
+});
+
+
+router.post('/getPassFromCategoria', (req, res) => {
+  const { email, categoria  } = req.body;
+
+  dbQuery.getPassFromCategoria(categoria, email, (err, userData) => {
+    if (!err) {
+      res.json(userData);
+    } else {
+      res.status(500).json(err);
+    }
+  });
+});
+
 
 
 // Se exporta el router del usuario para poder usarlo desde app.js (todas las rutas)

@@ -112,11 +112,54 @@ function reestablecer(email, pass, callback) {
 }
 
 
+function getCategorias(email, callback) {
+  const query = `
+    SELECT categoria.nombre
+    FROM categoria
+    INNER JOIN user_logged ON categoria.email_user = user_logged.email_user
+    WHERE user_logged.email_user = ?`;
+
+  mysqlConnection.query(query, [email], (err, rows) => {
+    if (err) {
+      callback({
+        status: 500,
+        message: 'ERROR: Inténtelo más tarde',
+        error: err
+      });
+    } else {
+      const categorias = rows.map(row => row.nombre);
+      callback(null, categorias);
+    }
+  });
+}
+
+function getPassFromCategoria(nombreCategoria, email, callback) {
+  const query = `
+    SELECT contraseña.id, contraseña.nombre, contraseña.username, contraseña.hash, contraseña.fecha_exp, contraseña.categoria
+    FROM contraseña
+    INNER JOIN categoria ON contraseña.categoria = categoria.nombre
+    WHERE categoria.nombre = ? AND contraseña.username=?`;
+
+  mysqlConnection.query(query, [nombreCategoria, email], (err, rows) => {
+    if (err) {
+      callback({
+        status: 500,
+        message: 'ERROR: Inténtelo más tarde',
+        error: err
+      });
+    } else {
+      callback(null, rows);
+    }
+  });
+}
+
   
 // exportar las funciones definidas en este fichero
 module.exports = {
   login,
   register,
   comprobarMail,
-  reestablecer
+  reestablecer,
+  getCategorias,
+  getPassFromCategoria
   };
