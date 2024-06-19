@@ -2,19 +2,27 @@ const mysqlConnection = require('./connection'); // Importa tu archivo de conexi
 const CryptoJS = require("crypto-js");
 const config = require('../../config'); // importar el fichero que contiene la clave secreta para el token
 
+function encryptPassword(password) {
+  return CryptoJS.AES.encrypt(password, config.secretKey).toString();
+}
+
+function decryptPassword(ciphertext) {
+  const bytes = CryptoJS.AES.decrypt(ciphertext, config.secretKey);
+  return bytes.toString(CryptoJS.enc.Utf8);
+}
 
 // ++++++++++++++++++++++++++++++++++++ USUARIOS NO_LOGGED ++++++++++++++++++++++++++++++++++++
 
 function login(user, pass, callback) {
-    const iterations = 1000;
-    const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations });
-  
-    mysqlConnection.query(
-      'SELECT email, rol FROM any_logged WHERE email  = ? AND pass = ?',
-      [user, hash.toString()],
-      (err, rows, fields) => {
-        if (!err) {
-          if (rows.length > 0) {
+  mysqlConnection.query(
+    'SELECT email, rol, pass FROM any_logged WHERE email = ?',
+    [user],
+    (err, rows, fields) => {
+      if (!err) {
+        if (rows.length > 0) {
+          const storedHash = rows[0].pass;
+          const decryptedPass = decryptPassword(storedHash);
+          if (decryptedPass === pass) {
             const userData = {
               usuario: rows[0].email,
               rol: rows[0].rol
@@ -24,56 +32,56 @@ function login(user, pass, callback) {
             callback('Usuario o clave incorrectos');
           }
         } else {
-          callback(err);
+          callback('Usuario o clave incorrectos');
         }
+      } else {
+        callback(err);
       }
-    );
-  }
+    }
+  );
+}
 
+function register(user, pass, nombre, callback) {
+  const hash = encryptPassword(pass);
 
-  function register(user, pass, nombre, callback) {
-    const iterations = 1000;
-    const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations }).toString();
-  
-    // Primero busca si el usuario ya existe
-    mysqlConnection.query(
-      'SELECT email, rol FROM any_logged WHERE email = ?',
-      [user],
-      (err, rows, fields) => {
-        if (err) {
-          callback({ status: 500, message: 'ERROR: Inténtelo más tarde', error: err });
-        } else if (rows.length > 0) {
-          // Si el usuario ya existe
-          callback({ status: 400, message: 'ERROR: Email ya registrado' });
-        } else {
-          // Si el usuario no existe, lo insertamos
-          mysqlConnection.query(
-            'INSERT INTO any_logged (email, pass, rol) VALUES (?, ?, ?)',
-            [user, hash, 'user'], // Asumimos que el rol por defecto es 'user'
-            (err, results) => {
-              if (err) {
-                callback({ status: 500, message: 'ERROR: Usuario no insertado', error: err });
-              } else {
-                // Después de insertar en any_logged, inserta en user_logged
-                mysqlConnection.query(
-                  'INSERT INTO user_logged (nombre, email_user) VALUES (?, ?)',
-                  [nombre, user],
-                  (err, results) => {
-                    if (err) {
-                      callback({ status: 500, message: 'ERROR: Usuario no insertado en user_logged', error: err });
-                    } else {
-                      callback({ status: 200, message: 'OK' });
-                    }
+  // Primero busca si el usuario ya existe
+  mysqlConnection.query(
+    'SELECT email, rol FROM any_logged WHERE email = ?',
+    [user],
+    (err, rows, fields) => {
+      if (err) {
+        callback({ status: 500, message: 'ERROR: Inténtelo más tarde', error: err });
+      } else if (rows.length > 0) {
+        // Si el usuario ya existe
+        callback({ status: 400, message: 'ERROR: Email ya registrado' });
+      } else {
+        // Si el usuario no existe, lo insertamos
+        mysqlConnection.query(
+          'INSERT INTO any_logged (email, pass, rol) VALUES (?, ?, ?)',
+          [user, hash, 'user'], // Asumimos que el rol por defecto es 'user'
+          (err, results) => {
+            if (err) {
+              callback({ status: 500, message: 'ERROR: Usuario no insertado', error: err });
+            } else {
+              // Después de insertar en any_logged, inserta en user_logged
+              mysqlConnection.query(
+                'INSERT INTO user_logged (nombre, email_user) VALUES (?, ?)',
+                [nombre, user],
+                (err, results) => {
+                  if (err) {
+                    callback({ status: 500, message: 'ERROR: Usuario no insertado en user_logged', error: err });
+                  } else {
+                    callback({ status: 200, message: 'OK' });
                   }
-                );
-              }
+                }
+              );
             }
-          );
-        }
+          }
+        );
       }
-    );
-  }
-  
+    }
+  );
+}
 
 function comprobarMail(email, callback) {
   mysqlConnection.query(
@@ -91,10 +99,8 @@ function comprobarMail(email, callback) {
   );
 }
 
-
 function reestablecer(email, pass, callback) {
-  const iterations = 1000;
-  const hash = CryptoJS.PBKDF2(pass, config.saltHash, { keySize: 256/32, iterations }).toString();
+  const hash = encryptPassword(pass);
 
   mysqlConnection.query(
     'UPDATE any_logged SET pass = ? WHERE email = ?',
@@ -110,7 +116,6 @@ function reestablecer(email, pass, callback) {
     }
   );
 }
-
 
 function getCategorias(email, callback) {
   const query = `
@@ -138,7 +143,7 @@ function getPassFromCategoria(nombreCategoria, email, callback) {
     SELECT contraseña.id, contraseña.nombre, contraseña.username, contraseña.hash, contraseña.fecha_exp, contraseña.categoria
     FROM contraseña
     INNER JOIN categoria ON contraseña.categoria = categoria.nombre
-    WHERE categoria.nombre = ? AND contraseña.username=?`;
+    WHERE categoria.nombre = ? AND contraseña.owner = ?`;
 
   mysqlConnection.query(query, [nombreCategoria, email], (err, rows) => {
     if (err) {
@@ -148,18 +153,40 @@ function getPassFromCategoria(nombreCategoria, email, callback) {
         error: err
       });
     } else {
-      callback(null, rows);
+      // Desencriptar cada contraseña
+      const result = rows.map(row => ({
+        ...row,
+        hash: this.decryptPassword(row.hash),
+        fecha_exp: formatDate(row.fecha_exp) // Formatear la fecha
+      }));
+      callback(null, result);
     }
   });
 }
+// Función para formatear la fecha en dd/mm/aaaa hh:mm
+function formatDate(date) {
+  if (!date) return null; // Manejar caso de fecha nula
 
-  
-// exportar las funciones definidas en este fichero
+  const formattedDate = new Date(date).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  return formattedDate;
+}
+
+
+// Exportar las funciones definidas en este fichero
 module.exports = {
   login,
   register,
   comprobarMail,
   reestablecer,
   getCategorias,
-  getPassFromCategoria
-  };
+  getPassFromCategoria,
+  encryptPassword,
+  decryptPassword
+};

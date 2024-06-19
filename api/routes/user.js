@@ -6,11 +6,6 @@ const config = require('../../config'); // Importa el fichero que contiene la cl
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 
-router.post('/prueba', (req, res) => {
-
-  res.json("ESTO ES UNA PRUEBA");
-
-});
 
 router.post('/getCategorias', (req, res) => {
   const { email } = req.body;
@@ -36,6 +31,7 @@ router.post('/getPassFromCategoria', (req, res) => {
     }
   });
 });
+
 
 
 
