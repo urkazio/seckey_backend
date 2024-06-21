@@ -117,6 +117,9 @@ function reestablecer(email, pass, callback) {
   );
 }
 
+
+// ++++++++++++++++++++++++++++++++++++ USUARIO ++++++++++++++++++++++++++++++++++++++++
+
 function getCategorias(email, callback) {
   const query = `
     SELECT categoria.nombre
@@ -138,12 +141,15 @@ function getCategorias(email, callback) {
   });
 }
 
+
 function getPassFromCategoria(nombreCategoria, email, callback) {
   const query = `
     SELECT contraseña.id, contraseña.nombre, contraseña.username, contraseña.hash, contraseña.fecha_exp, contraseña.categoria
     FROM contraseña
     INNER JOIN categoria ON contraseña.categoria = categoria.nombre
-    WHERE categoria.nombre = ? AND contraseña.owner = ?`;
+    WHERE categoria.nombre = ? AND contraseña.owner = ?
+    ORDER BY contraseña.nombre ASC`; // Ordena los resultados por el nombre de la categoría en orden alfabético
+
 
   mysqlConnection.query(query, [nombreCategoria, email], (err, rows) => {
     if (err) {
@@ -163,6 +169,7 @@ function getPassFromCategoria(nombreCategoria, email, callback) {
     }
   });
 }
+
 // Función para formatear la fecha en dd/mm/aaaa hh:mm
 function formatDate(date) {
   if (!date) return null; // Manejar caso de fecha nula
@@ -174,9 +181,44 @@ function formatDate(date) {
     hour: '2-digit',
     minute: '2-digit'
   });
-
   return formattedDate;
 }
+
+
+function crearCategoria(email, nombrecat, callback) {
+  const query = `
+    INSERT INTO categoria (nombre, email_user)
+    VALUES (?, ?)
+  `;
+
+  mysqlConnection.query(query, [nombrecat, email], (err, result) => {
+    if (err) {
+      callback({ status: 500, message: 'ERROR: No se pudo insertar la categoría', error: err });
+    } else {
+      callback(null, { status: 200, message: 'Categoría insertada exitosamente' });
+    }
+  });
+}
+
+
+function crearContrasena(nombre, username, pass, fecha_exp, nombreCat, owner, callback) {
+  const cripto = encryptPassword(pass);
+
+  const query = `
+    INSERT INTO contraseña (nombre, username, hash, fecha_exp, categoria, owner)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+
+  mysqlConnection.query(query, [nombre, username, cripto, fecha_exp, nombreCat, owner], (err, result) => {
+    if (err) {
+      console.error('Error al ejecutar consulta SQL:', err); // Log de errores
+      callback({ status: 500, message: 'ERROR: No se pudo insertar la contraseña', error: err });
+    } else {
+      callback(null, { status: 200, message: 'Contraseña insertada exitosamente' });
+    }
+  });
+}
+
 
 
 // Exportar las funciones definidas en este fichero
@@ -188,5 +230,7 @@ module.exports = {
   getCategorias,
   getPassFromCategoria,
   encryptPassword,
-  decryptPassword
+  decryptPassword,
+  crearCategoria,
+  crearContrasena
 };

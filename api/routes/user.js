@@ -33,6 +33,33 @@ router.post('/getPassFromCategoria', (req, res) => {
 });
 
 
+router.post('/crearCategoria', (req, res) => {
+  const { email, nombreCat  } = req.body;
+
+  dbQuery.crearCategoria(email, nombreCat, (err, userData) => {
+    if (!err) {
+      res.json(userData);
+    } else {
+      res.status(500).json(err);
+    }
+  });
+});
+
+
+router.post('/crearContrasena', (req, res) => {
+  const { nombre, username, pass, fecha_exp, nombreCat, owner  } = req.body;
+
+  dbQuery.crearContrasena(nombre, username, pass, fecha_exp, nombreCat, owner, (err, userData) => {
+    if (!err) {
+      res.json(userData);
+    } else {
+      res.status(500).json(err);
+    }
+  });
+});
+
+
+
 
 
 // Se exporta el router del usuario para poder usarlo desde app.js (todas las rutas)
