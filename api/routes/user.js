@@ -59,6 +59,30 @@ router.post('/crearContrasena', (req, res) => {
 });
 
 
+router.post('/borrarContrasena', (req, res) => {
+  const { passId } = req.body;
+
+  dbQuery.borrarContrasena(passId, (err, userData) => {
+    if (!err) {
+      res.json(userData);
+    } else {
+      res.status(500).json(err);
+    }
+  });
+});
+
+router.post('/borrarCategoria', (req, res) => {
+  const { nombre } = req.body;
+
+  dbQuery.borrarCategoria(nombre, (err, userData) => {
+    if (!err) {
+      res.json(userData);
+    } else {
+      res.status(500).json(err);
+    }
+  });
+})
+
 
 
 

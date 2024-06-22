@@ -220,6 +220,60 @@ function crearContrasena(nombre, username, pass, fecha_exp, nombreCat, owner, ca
 }
 
 
+function borrarContrasena(id, callback) {
+  const query = `
+    DELETE FROM contraseña
+    WHERE id = ?
+  `;
+
+  mysqlConnection.query(query, [id], (err, result) => {
+    if (err) {
+      callback({ status: 500, message: 'ERROR: No se pudo borrar la contraseña', error: err });
+    } else {
+      if (result.affectedRows === 0) {
+        callback({ status: 404, message: 'No se encontró la contraseña con el id proporcionado' });
+      } else {
+        callback(null, { status: 200, message: 'Contraseña borrada exitosamente' });
+      }
+    }
+  });
+}
+
+
+function borrarCategoria(nombreCategoria, callback) {
+  // Primero borramos todas las contraseñas asociadas a la categoría
+  const deletePasswordsQuery = `
+    DELETE FROM contraseña
+    WHERE categoria = ?
+  `;
+
+  mysqlConnection.query(deletePasswordsQuery, [nombreCategoria], (err, result) => {
+    if (err) {
+      callback({ status: 500, message: 'ERROR: No se pudieron borrar las contraseñas de la categoría', error: err });
+    } else {
+      // Luego borramos la categoría en sí
+      const deleteCategoriaQuery = `
+        DELETE FROM categoria
+        WHERE nombre = ?
+      `;
+
+      mysqlConnection.query(deleteCategoriaQuery, [nombreCategoria], (err, result) => {
+        if (err) {
+          callback({ status: 500, message: 'ERROR: No se pudo borrar la categoría', error: err });
+        } else {
+          if (result.affectedRows === 0) {
+            callback({ status: 404, message: 'No se encontró la categoría con el nombre proporcionado' });
+          } else {
+            callback(null, { status: 200, message: 'Categoría y contraseñas asociadas borradas exitosamente' });
+          }
+        }
+      });
+    }
+  });
+}
+
+
+
 
 // Exportar las funciones definidas en este fichero
 module.exports = {
@@ -232,5 +286,7 @@ module.exports = {
   encryptPassword,
   decryptPassword,
   crearCategoria,
-  crearContrasena
+  crearContrasena,
+  borrarContrasena,
+  borrarCategoria
 };
