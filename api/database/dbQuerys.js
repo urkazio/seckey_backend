@@ -186,19 +186,39 @@ function formatDate(date) {
 
 
 function crearCategoria(email, nombrecat, callback) {
-  const query = `
-    INSERT INTO categoria (nombre, email_user)
-    VALUES (?, ?)
+  // Primero verificar si la categoría ya existe
+  const checkQuery = `
+    SELECT COUNT(*) AS count
+    FROM categoria
+    WHERE nombre = ? AND email_user = ?
   `;
 
-  mysqlConnection.query(query, [nombrecat, email], (err, result) => {
+  mysqlConnection.query(checkQuery, [nombrecat, email], (err, rows) => {
     if (err) {
-      callback({ status: 500, message: 'ERROR: No se pudo insertar la categoría', error: err });
+      callback({ status: 500, message: 'ERROR al verificar la existencia de la categoría', error: err });
     } else {
-      callback(null, { status: 200, message: 'Categoría insertada exitosamente' });
+      const count = rows[0].count;
+      if (count > 0) {
+        callback(null, { status: 409, message: 'La categoría ya existe' });
+      } else {
+        // Si la categoría no existe, proceder a insertarla
+        const insertQuery = `
+          INSERT INTO categoria (nombre, email_user)
+          VALUES (?, ?)
+        `;
+
+        mysqlConnection.query(insertQuery, [nombrecat, email], (err, result) => {
+          if (err) {
+            callback({ status: 500, message: 'ERROR: No se pudo insertar la categoría', error: err });
+          } else {
+            callback(null, { status: 200, message: 'Categoría insertada exitosamente' });
+          }
+        });
+      }
     }
   });
 }
+
 
 
 function crearContrasena(nombre, username, pass, fecha_exp, nombreCat, owner, callback) {
