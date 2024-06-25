@@ -293,6 +293,86 @@ function borrarCategoria(nombreCategoria, callback) {
 }
 
 
+function verificarContraseñasPorExpirar(callback) {
+  const query = `
+    SELECT c.nombre AS nombreContrasena, u.email_user, u.nombre
+    FROM contraseña c
+    JOIN user_logged u ON c.owner = u.email_user
+    WHERE c.fecha_exp BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+  `;
+
+  mysqlConnection.query(query, (err, rows) => {
+    if (err) {
+      callback(err);
+    } else {
+      console.log(rows)
+      callback(null, rows);
+    }
+  });
+}
+
+
+
+function editarContrasena(nombre, username, nuevaContrasena, fecha_exp, id, callback) {
+  console.log("Datos recibidos:", { nombre, username, nuevaContrasena, id });
+
+  const nuevaHash = encryptPassword(nuevaContrasena);
+
+  const verificarQuery = `
+    SELECT hash_pass_antigua
+    FROM cambios_contraseñas
+    WHERE id_contraseña = ? AND fecha_hora_cambio >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+  `;
+
+  mysqlConnection.query(verificarQuery, [id], (err, rows) => {
+    if (err) {
+      console.error("Error al verificar contraseñas anteriores:", err);
+      return callback({ status: 500, message: 'Error al verificar contraseñas anteriores'});
+    }
+
+    // Desencriptar las contraseñas antiguas y comprobar si alguna coincide con la nueva
+    const contrasenaUsada = rows.some(row => decryptPassword(row.hash_pass_antigua) === nuevaContrasena);
+    console.log("contraseña usada en los últimos 3 meses:", contrasenaUsada);
+
+    if (!contrasenaUsada) {
+      // Actualizar la contraseña
+      const actualizarQuery = `
+        UPDATE contraseña
+        SET nombre = ?, username = ?, hash = ?, fecha_exp = ?
+        WHERE id = ?
+      `;
+
+      mysqlConnection.query(actualizarQuery, [nombre, username, nuevaHash, fecha_exp, id], (err, result) => {
+        if (err) {
+          console.error("Error al actualizar la contraseña:", err);
+          callback({ status: 500, message: 'Error al actualizar la contraseña'});
+        }
+
+        // Registrar el cambio en la tabla cambios_contraseñas
+        const registrarCambioQuery = `
+          INSERT INTO cambios_contraseñas (id_contraseña, fecha_hora_cambio, hash_pass_antigua)
+          VALUES (?, NOW(), ?)
+        `;
+
+        mysqlConnection.query(registrarCambioQuery, [id, nuevaHash], (err, result) => {
+          if (err) {
+            console.error("Error al registrar el cambio de contraseña:", err);
+            callback({ status: 500, message: 'Error al registrar el cambio de contraseña'});
+          }
+
+          callback(null, { status: 200, message: 'Contraseña actualizada exitosamente' });
+        });
+      });
+
+    } else {
+      callback(null, { status: 409, message: 'Contraseña ya usada hace menos de 3 meses' });
+    }
+  });
+}
+
+
+
+
 
 
 // Exportar las funciones definidas en este fichero
@@ -308,5 +388,7 @@ module.exports = {
   crearCategoria,
   crearContrasena,
   borrarContrasena,
-  borrarCategoria
+  borrarCategoria,
+  verificarContraseñasPorExpirar,
+  editarContrasena
 };
