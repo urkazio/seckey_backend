@@ -94,9 +94,7 @@ router.post('/borrarCategoria', (req, res) => {
 
 router.post('/editarContrasena', (req, res) => {
   const { nombre, username, contrasena, fecha_exp, id } = req.body;
-
-  console.log(fecha_exp)
-  
+ 
   dbQuery.editarContrasena(nombre, username, contrasena, fecha_exp, id, (err, userData) => {
     if (!err) {
       res.json(userData);
@@ -105,6 +103,8 @@ router.post('/editarContrasena', (req, res) => {
     }
   });
 });
+
+
 
 
 

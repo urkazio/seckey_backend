@@ -1,6 +1,8 @@
 const mysqlConnection = require('./connection'); // Importa tu archivo de conexión a MySQL
 const CryptoJS = require("crypto-js");
 const config = require('../../config'); // importar el fichero que contiene la clave secreta para el token
+const e = require('express');
+
 
 function encryptPassword(password) {
   return CryptoJS.AES.encrypt(password, config.secretKey).toString();
@@ -305,7 +307,6 @@ function verificarContraseñasPorExpirar(callback) {
     if (err) {
       callback(err);
     } else {
-      console.log(rows)
       callback(null, rows);
     }
   });
@@ -371,6 +372,158 @@ function editarContrasena(nombre, username, nuevaContrasena, fecha_exp, id, call
 }
 
 
+// ++++++++++++++++++++++++++++++++++++ USUARIOS ADMIN_LOGGED ++++++++++++++++++++++++++++++++++++
+
+
+function getUsers(callback) {
+  const query = `
+    SELECT 
+      COALESCE(admin_logged.nombre, user_logged.nombre) AS nombre, 
+      any_logged.email, 
+      any_logged.rol
+    FROM any_logged
+    LEFT JOIN admin_logged ON any_logged.email = admin_logged.email_admin
+    LEFT JOIN user_logged ON any_logged.email = user_logged.email_user;
+  `;
+
+  mysqlConnection.query(query, (err, rows) => {
+    if (err) {
+      callback({
+        status: 500,
+        message: 'ERROR: Inténtelo más tarde',
+        error: err
+      });
+    } else {
+      callback(null, rows);
+    }
+  });
+}
+
+
+function borrarUsuario(emailUsuario, callback) {
+  // Primero borramos los registros de cambios_contraseñas asociados al usuario
+  const deleteCambiosQuery = `
+    DELETE FROM cambios_contraseñas
+    WHERE id_contraseña IN (
+      SELECT contraseña.id
+      FROM contraseña
+      WHERE contraseña.owner = ?
+    )
+  `;
+  
+  mysqlConnection.query(deleteCambiosQuery, [emailUsuario], (err, result) => {
+    if (err) {
+      callback({ status: 500, message: 'ERROR: No se pudieron borrar los cambios de contraseña del usuario', error: err });
+    } else {
+      // Luego borramos todas las contraseñas asociadas al usuario
+      const deletePasswordsQuery = `
+        DELETE FROM contraseña
+        WHERE owner = ?
+      `;
+      
+      mysqlConnection.query(deletePasswordsQuery, [emailUsuario], (err, result) => {
+        if (err) {
+          callback({ status: 500, message: 'ERROR: No se pudieron borrar las contraseñas del usuario', error: err });
+        } else {
+          // Después borramos todas las categorías del usuario
+          const deleteCategoriasQuery = `
+            DELETE FROM categoria
+            WHERE email_user = ?
+          `;
+          
+          mysqlConnection.query(deleteCategoriasQuery, [emailUsuario], (err, result) => {
+            if (err) {
+              callback({ status: 500, message: 'ERROR: No se pudieron borrar las categorías del usuario', error: err });
+            } else {
+              // Borramos al usuario de user_logged
+              const deleteUserLoggedQuery = `
+                DELETE FROM user_logged
+                WHERE email_user = ?
+              `;
+              
+              mysqlConnection.query(deleteUserLoggedQuery, [emailUsuario], (err, result) => {
+                if (err) {
+                  callback({ status: 500, message: 'ERROR: No se pudo borrar al usuario de user_logged', error: err });
+                } else {
+                  // Finalmente, borramos al usuario de any_logged
+                  const deleteAnyLoggedQuery = `
+                    DELETE FROM any_logged
+                    WHERE email = ?
+                  `;
+                  
+                  mysqlConnection.query(deleteAnyLoggedQuery, [emailUsuario], (err, result) => {
+                    if (err) {
+                      callback({ status: 500, message: 'ERROR: No se pudo borrar al usuario de any_logged', error: err });
+                    } else {
+                      if (result.affectedRows === 0) {
+                        callback({ status: 404, message: 'No se encontró al usuario con el email proporcionado' });
+                      } else {
+                        callback(null, { status: 200, message: 'Usuario, categorías, contraseñas y entradas relacionadas borradas exitosamente' });
+                      }
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+  });
+}
+
+
+
+function editarUsuario(nuevoEmail, emailAntiguo, callback) {
+  // Check if nuevoEmail exists in any_logged
+  const checkEmailQuery = `
+    SELECT email FROM any_logged WHERE email = ?
+  `;
+  
+  mysqlConnection.query(checkEmailQuery, [emailAntiguo], (err, results) => {
+    if (err) {
+      callback({ status: 500, message: 'Error checking email existence', error: err });
+    } else if (results.length === 0) {
+      // Nuevo email does not exist, so insert it first
+      const insertEmailQuery = `
+        INSERT INTO any_logged (email, pass, rol) VALUES (?, 'hashed_password', 'user')
+      `;
+      
+      mysqlConnection.query(insertEmailQuery, [nuevoEmail], (err, result) => {
+        if (err) {
+          callback({ status: 500, message: 'Error inserting new email into any_logged', error: err });
+        } else {
+          // Now update user_logged.email_user
+          updateUsuarioLogged(nuevoEmail, emailAntiguo, callback);
+        }
+      });
+    } else {
+      // Nuevo email already exists, proceed with update
+      updateUsuarioLogged(nuevoEmail, emailAntiguo, callback);
+    }
+  });
+}
+
+function updateUsuarioLogged(nuevoEmail, emailAntiguo, callback) {
+  // Update user_logged.email_user
+  const updateUserLoggedQuery = `
+    UPDATE user_logged
+    SET email_user = ?
+    WHERE email_user = ?
+  `;
+  
+  mysqlConnection.query(updateUserLoggedQuery, [nuevoEmail, emailAntiguo], (err, result) => {
+    if (err) {
+      callback({ status: 500, message: 'ERROR: No se pudo actualizar el email en user_logged', error: err });
+    } else {
+      // Handle successful update
+      callback(null, { status: 200, message: 'Usuario y entradas relacionadas actualizadas exitosamente' });
+    }
+  });
+}
+
+
+
 
 
 
@@ -390,5 +543,8 @@ module.exports = {
   borrarContrasena,
   borrarCategoria,
   verificarContraseñasPorExpirar,
-  editarContrasena
+  editarContrasena,
+  getUsers,
+  borrarUsuario,
+  editarUsuario
 };
